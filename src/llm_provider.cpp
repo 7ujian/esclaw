@@ -158,26 +158,37 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   }
   ::Serial.println("JSON parsed successfully");
 
+  ::Serial.println("Checking for choices...");
   if (!respDoc.containsKey("choices")) {
     response.finishReason = "error: no choices";
+    ::Serial.println("No choices in response");
     return response;
   }
+  ::Serial.println("Choices found");
 
   JsonArray choices = respDoc["choices"];
+  ::Serial.println("Choices count: " + String(choices.size()));
   if (choices.size() == 0) {
     response.finishReason = "error: empty choices";
+    ::Serial.println("Empty choices");
     return response;
   }
 
   JsonObject choice = choices[0];
+  ::Serial.println("Getting choice[0]...");
   if (choice.containsKey("finish_reason")) {
     response.finishReason = choice["finish_reason"].as<String>();
+    ::Serial.println("Finish reason: " + response.finishReason);
   }
 
+  ::Serial.println("Checking for message...");
   if (choice.containsKey("message")) {
+    ::Serial.println("Message found");
     JsonObject msg = choice["message"];
     if (msg.containsKey("content")) {
+      ::Serial.println("Content found, extracting...");
       response.content = msg["content"].as<String>();
+      ::Serial.println("Content extracted: " + String(response.content.length()) + " bytes");
     }
 
     if (msg.containsKey("tool_calls")) {
