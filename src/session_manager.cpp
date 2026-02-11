@@ -112,7 +112,7 @@ void SessionManager::saveSession(const String& sessionId) {
     return;
   }
 
-  StaticJsonDocument<2048> doc;
+  StaticJsonDocument<1024> doc;
   doc["sessionId"] = session->sessionId;
   doc["lastUpdated"] = session->lastUpdated;
 
