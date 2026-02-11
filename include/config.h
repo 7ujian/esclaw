@@ -36,6 +36,10 @@ struct WebServerConfig {
   int port;
 };
 
+struct LoggingConfig {
+  int level;
+};
+
 class Config {
 public:
   static Config& getInstance();
@@ -48,6 +52,7 @@ public:
   AgentConfig& getAgentConfig();
   ProvidersConfig& getProvidersConfig();
   WebServerConfig& getWebServerConfig();
+  LoggingConfig& getLoggingConfig();
 
   String getProviderKey(const String& provider);
   String getProviderBase(const String& provider);

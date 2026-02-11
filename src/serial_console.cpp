@@ -2,6 +2,7 @@
 #include "config.h"
 #include "wifi_manager.h"
 #include "message_bus.h"
+#include "logger.h"
 #include <Arduino.h>
 #include <LittleFS.h>
 
@@ -42,8 +43,8 @@ void SerialConsole::println(const String& message) {
 
 void SerialConsole::update() {
   while (Serial.available()) {
-    char c = Serial.read();
-
+    int c = Serial.read();
+    
     if (c == '\r' || c == '\n') {
       if (inputBuffer_.length() > 0) {
         inputReady_ = true;
@@ -51,63 +52,16 @@ void SerialConsole::update() {
         inputBuffer_ = "";
         inputReady_ = false;
       }
-    } else if (c == 127) {
+    } else if (c == '\b' || c == 127) {
       if (inputBuffer_.length() > 0) {
         inputBuffer_.remove(inputBuffer_.length() - 1);
         Serial.print("\b \b");
       }
-    } else if (c >= 32 && c <= 126) {
-      inputBuffer_ += c;
-      Serial.print(c);
+    } else if (c >= 0 && c <= 255) {
+      inputBuffer_ += (char)c;
+      Serial.write((char)c);
     }
   }
-}
-
-void SerialConsole::processCommand(const String& command) {
-  if (command.startsWith("/")) {
-    String cmd = command.substring(1);
-    int spaceIndex = cmd.indexOf(' ');
-
-    String action;
-    String args;
-
-    if (spaceIndex > 0) {
-      action = cmd.substring(0, spaceIndex);
-      args = cmd.substring(spaceIndex + 1);
-    } else {
-      action = cmd;
-    }
-
-    action.toLowerCase();
-
-    if (action == "help") {
-      handleHelp();
-    } else if (action == "status") {
-      handleStatus();
-    } else if (action == "config") {
-      handleConfig(args);
-    } else if (action == "configfile") {
-      handleConfigFile();
-    } else if (action == "reboot") {
-      handleReboot();
-    } else if (action == "chat") {
-      String message = args;
-      InboundMessage msg;
-      msg.channel = "serial";
-      msg.senderId = "user";
-      msg.content = message;
-      msg.sessionId = "default";
-      msg.timestamp = millis();
-      MessageBus::getInstance().publishInbound(msg);
-    } else {
-      Serial.println("Unknown command. Type /help for available commands.");
-    }
-  } else {
-    Serial.println("Commands must start with /");
-  }
-
-  Serial.println();
-  Serial.println("🦞 ");
 }
 
 String maskApiKey(const String& key) {
@@ -179,6 +133,9 @@ void SerialConsole::showConfigHelp() {
   Serial.println("  providers.zhipu.apiKey <key>       Set Zhipu AI API key");
   Serial.println("  providers.groq.apiKey <key>        Set Groq API key");
   Serial.println();
+  Serial.println("Logging:");
+  Serial.println("  log.level <0-2>          Set log level (0=none, 1=basic, 2=verbose)");
+  Serial.println();
   Serial.println("Usage: /config <key> <value>");
   Serial.println("Example: /config providers.zhipu.apiKey sk-xxxxx");
 }
@@ -205,6 +162,15 @@ void SerialConsole::handleConfig(const String& args) {
   } else if (key == "agent.model") {
     config.getAgentConfig().model = value;
     Serial.println("Model set to: " + value);
+  } else if (key == "log.level") {
+    int level = value.toInt();
+    if (level >= 0 && level <= 2) {
+      Logger::getInstance().setLevel((LogLevel)level);
+      Serial.println("Log level set to: " + String(level) + " (0=none, 1=basic, 2=verbose)");
+    } else {
+      Serial.println("Invalid log level. Use 0, 1, or 2");
+      return;
+    }
   } else if (key.startsWith("providers.")) {
     String provider = key.substring(10);
     int dotIndex = provider.indexOf('.');
@@ -288,6 +254,7 @@ void SerialConsole::handleStatus() {
 
   Serial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
   Serial.println("Uptime: " + String(millis() / 1000) + " seconds");
+  Serial.println("Log Level: " + String(Logger::getInstance().getLevel()));
   
   Config& config = Config::getInstance();
   Serial.println("Model: " + config.getAgentConfig().model);
@@ -297,4 +264,51 @@ void SerialConsole::handleReboot() {
   Serial.println("Rebooting...");
   delay(1000);
   ESP.restart();
+}
+
+void SerialConsole::processCommand(const String& command) {
+  if (command.startsWith("/")) {
+    String cmd = command.substring(1);
+    int spaceIndex = cmd.indexOf(' ');
+
+    String action;
+    String args;
+
+    if (spaceIndex > 0) {
+      action = cmd.substring(0, spaceIndex);
+      args = cmd.substring(spaceIndex + 1);
+    } else {
+      action = cmd;
+    }
+
+    action.toLowerCase();
+
+    if (action == "help") {
+      handleHelp();
+    } else if (action == "status") {
+      handleStatus();
+    } else if (action == "config") {
+      handleConfig(args);
+    } else if (action == "configfile") {
+      handleConfigFile();
+    } else if (action == "reboot") {
+      handleReboot();
+    } else if (action == "chat") {
+      String message = args;
+      InboundMessage msg;
+      msg.channel = "serial";
+      msg.senderId = "user";
+      msg.content = message;
+      msg.sessionId = "default";
+      msg.timestamp = millis();
+      MessageBus::getInstance().publishInbound(msg);
+    } else {
+      Serial.println("Unknown command. Type /help for available commands.");
+    }
+  } else {
+    Serial.println("Commands must start with /");
+  }
+
+  Serial.println();
+  Serial.println("🦞 ");
 }

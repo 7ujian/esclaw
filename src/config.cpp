@@ -1,5 +1,5 @@
 #include "config.h"
-#include "config.h"
+#include "logger.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
@@ -42,22 +42,21 @@ void Config::setDefaults() {
 
 bool Config::load() {
   if (!LittleFS.exists(CONFIG_PATH)) {
-    ::Serial.println("Config file not found, creating default");
+    LOG("Config file not found, creating default");
     setDefaults();
     return save();
   }
 
   File file = LittleFS.open(CONFIG_PATH, "r");
   if (!file) {
-    ::Serial.println("Failed to open config file");
     return false;
   }
 
   size_t fileSize = file.size();
-  ::Serial.println("Config file size: " + String(fileSize) + " bytes");
+  LOG("Config file size: " + String(fileSize) + " bytes");
 
   if (fileSize > 1024) {
-    ::Serial.println("Config file too large for buffer");
+    LOG("Config file too large for buffer");
     file.close();
     return false;
   }
@@ -67,14 +66,14 @@ bool Config::load() {
   file.close();
 
   if (error) {
-    ::Serial.println("JSON parse error: " + String(error.c_str()));
+    LOG("JSON parse error: " + String(error.c_str()));
     return false;
   }
 
-  ::Serial.println("JSON parsed successfully");
+  LOG("JSON parsed successfully");
   setDefaults();
   loadFromJson(doc.as<JsonObject>());
-  ::Serial.println("Config loaded. SSID: " + wifiConfig_.ssid);
+  LOG("Config loaded. SSID: " + wifiConfig_.ssid);
   return true;
 }
 

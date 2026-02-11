@@ -1,4 +1,5 @@
 #include "llm_provider.h"
+#include "logger.h"
 #include <ArduinoHttpClient.h>
 #include <WiFiClientSecure.h>
 
@@ -46,19 +47,18 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   root["model"] = model;
   JsonArray msgs = root.createNestedArray("messages");
 
-  ::Serial.println("Building request for model: " + model);
-  ::Serial.println("Is Zhipu API: " + String(isZhipuAPI ? "yes" : "no"));
+  LOG_VERBOSE("Building request for model: " + model);
+  LOG_VERBOSE("Is Zhipu API: " + String(isZhipuAPI ? "yes" : "no"));
 
   for (int i = 0; i < messageCount; i++) {
     if (isZhipuAPI && messages[i].role == "system") {
-      ::Serial.println("  Skipping system message for Zhipu API");
+      LOG_VERBOSE("Skipping system message for Zhipu API");
       continue;
     }
 
     JsonObject msgObj = msgs.createNestedObject();
     msgObj["role"] = messages[i].role;
     msgObj["content"] = messages[i].content;
-    ::Serial.println("  [" + messages[i].role + "] " + messages[i].content.substring(0, 30) + "...");
 
     int tcCount = 0;
     for (int j = 0; j < MAX_TOOL_CALLS; j++) {
@@ -93,14 +93,12 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
     }
     root["tool_choice"] = "auto";
   } else if (isZhipuAPI && toolCount > 0) {
-    ::Serial.println("Zhipu API detected, skipping tools (not supported)");
+    LOG_VERBOSE("Zhipu API detected, skipping tools (not supported)");
   }
 
   if (isZhipuAPI) {
     root["max_tokens"] = (maxTokens > 4096) ? 4096 : maxTokens;
     root["temperature"] = round(temperature * 10) / 10.0;
-    ::Serial.println("Zhipu API: limited max_tokens to " + String(root["max_tokens"].as<int>()));
-    ::Serial.println("Zhipu API: rounded temperature to " + String(root["temperature"].as<float>()));
   } else {
     root["max_tokens"] = maxTokens;
     root["temperature"] = temperature;
@@ -109,16 +107,11 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   String requestBody;
   serializeJson(doc, requestBody);
 
-  ::Serial.println("API Base: " + apiBase_);
-  ::Serial.println("Host: " + host);
-  ::Serial.println("Path: " + path);
-  ::Serial.println("API Key: " + (apiKey_.isEmpty() ? "(empty)" : (apiKey_.substring(0, 8) + "..." + apiKey_.substring(apiKey_.length() - 4))));
-  ::Serial.println();
-  ::Serial.println("Sending request...");
-  ::Serial.println("Request body:");
-  ::Serial.println(requestBody);
-  ::Serial.println();
-  ::Serial.println("Request size: " + String(requestBody.length()) + " bytes");
+  LOG_VERBOSE("API Base: " + apiBase_);
+  LOG_VERBOSE("Host: " + host);
+  LOG_VERBOSE("Path: " + path);
+  LOG_VERBOSE("API Key: " + (apiKey_.isEmpty() ? "(empty)" : (apiKey_.substring(0, 8) + "..." + apiKey_.substring(apiKey_.length() - 4))));
+  LOG_VERBOSE("Request body: " + requestBody);
 
   http.beginRequest();
   http.post(path);
@@ -132,71 +125,58 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   http.endRequest();
 
   int statusCode = http.responseStatusCode();
-  ::Serial.println("Status: " + String(statusCode));
+  LOG_VERBOSE("Status: " + String(statusCode));
 
   if (statusCode != 200) {
     String errorBody = http.responseBody();
-    ::Serial.println("Error: " + errorBody);
+    LOG("Error: " + errorBody);
     response.finishReason = "error: HTTP " + String(statusCode);
     http.stop();
     return response;
   }
 
   String responseBody = http.responseBody();
-  ::Serial.println("Response: " + String(responseBody.length()) + " bytes");
   http.stop();
 
-  ::Serial.println("Parsing JSON...");
+  LOG_VERBOSE("Parsing JSON...");
   DynamicJsonDocument respDoc(4096);
   DeserializationError error = deserializeJson(respDoc, responseBody);
 
   if (error) {
-    ::Serial.println("JSON parse error: " + String(error.c_str()));
-    ::Serial.println("Response body preview: " + responseBody.substring(0, 200));
+    LOG("JSON parse error: " + String(error.c_str()));
+    LOG("Response body preview: " + responseBody.substring(0, 200));
     response.finishReason = "error: JSON parse failed";
     return response;
   }
-  ::Serial.println("JSON parsed successfully");
 
-  ::Serial.println("Checking for choices...");
+  LOG_VERBOSE("Checking for choices...");
   if (!respDoc.containsKey("choices")) {
     response.finishReason = "error: no choices";
-    ::Serial.println("No choices in response");
     return response;
   }
-  ::Serial.println("Choices found");
 
   JsonArray choices = respDoc["choices"];
-  ::Serial.println("Choices count: " + String(choices.size()));
   if (choices.size() == 0) {
     response.finishReason = "error: empty choices";
-    ::Serial.println("Empty choices");
     return response;
   }
 
   JsonObject choice = choices[0];
-  ::Serial.println("Getting choice[0]...");
   if (choice.containsKey("finish_reason")) {
     response.finishReason = choice["finish_reason"].as<String>();
-    ::Serial.println("Finish reason: " + response.finishReason);
   }
 
-  ::Serial.println("Checking for message...");
+  LOG_VERBOSE("Checking for message...");
   if (choice.containsKey("message")) {
-    ::Serial.println("Message found");
     JsonObject msg = choice["message"];
     if (msg.containsKey("content")) {
-      ::Serial.println("Content found, extracting...");
       response.content = msg["content"].as<String>();
-      ::Serial.println("Content extracted: " + String(response.content.length()) + " bytes");
     }
 
-    ::Serial.println("Checking for tool_calls...");
+    LOG_VERBOSE("Checking for tool_calls...");
     if (msg.containsKey("tool_calls")) {
-      ::Serial.println("Tool calls found");
       JsonArray toolCalls = msg["tool_calls"];
       response.toolCallCount = 0;
-      ::Serial.println("Tool calls count: " + String(toolCalls.size()));
       for (JsonVariant tcJson : toolCalls) {
         if (response.toolCallCount >= MAX_TOOL_CALLS) break;
 
@@ -225,15 +205,11 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
 
         response.toolCallCount++;
       }
-      ::Serial.println("Processed " + String(response.toolCallCount) + " tool calls");
-    } else {
-      ::Serial.println("No tool calls");
     }
   }
-  ::Serial.println("Checking for usage...");
+  LOG_VERBOSE("Checking for usage...");
 
   if (respDoc.containsKey("usage")) {
-    ::Serial.println("Usage found");
     JsonObject usage = respDoc["usage"];
     if (usage.containsKey("prompt_tokens")) {
       response.promptTokens = usage["prompt_tokens"].as<int>();
@@ -244,12 +220,8 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
     if (usage.containsKey("total_tokens")) {
       response.totalTokens = usage["total_tokens"].as<int>();
     }
-    ::Serial.println("Tokens - prompt:" + String(response.promptTokens) + " completion:" + String(response.completionTokens) + " total:" + String(response.totalTokens));
-  } else {
-    ::Serial.println("No usage");
   }
 
-  ::Serial.println("Returning response...");
   return response;
 }
 
