@@ -59,6 +59,7 @@ bool Config::load() {
     return false;
   }
 
+  setDefaults();
   loadFromJson(doc.as<JsonObject>());
   return true;
 }
