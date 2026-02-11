@@ -96,8 +96,15 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
     ::Serial.println("Zhipu API detected, skipping tools (not supported)");
   }
 
-  root["max_tokens"] = maxTokens;
-  root["temperature"] = temperature;
+  if (isZhipuAPI) {
+    root["max_tokens"] = (maxTokens > 4096) ? 4096 : maxTokens;
+    root["temperature"] = round(temperature * 10) / 10.0;
+    ::Serial.println("Zhipu API: limited max_tokens to " + String(root["max_tokens"].as<int>()));
+    ::Serial.println("Zhipu API: rounded temperature to " + String(root["temperature"].as<float>()));
+  } else {
+    root["max_tokens"] = maxTokens;
+    root["temperature"] = temperature;
+  }
 
   String requestBody;
   serializeJson(doc, requestBody);
