@@ -56,7 +56,7 @@ bool Config::load() {
   size_t fileSize = file.size();
   ::Serial.println("Config file size: " + String(fileSize) + " bytes");
 
-  if (fileSize > 512) {
+  if (fileSize > 1024) {
     ::Serial.println("Config file too large for buffer");
     file.close();
     return false;
