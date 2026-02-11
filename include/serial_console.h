@@ -29,6 +29,7 @@ private:
    void handleHelp();
    void handleStatus();
    void handleConfig(const String& args);
+   void handleConfigFile();
    void handleReboot();
  };
 

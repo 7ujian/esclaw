@@ -3,6 +3,7 @@
 #include "wifi_manager.h"
 #include "message_bus.h"
 #include <Arduino.h>
+#include <LittleFS.h>
 
 SerialConsole::SerialConsole() : inputReady_(false) {
 }
@@ -85,6 +86,8 @@ void SerialConsole::processCommand(const String& command) {
       handleStatus();
     } else if (action == "config") {
       handleConfig(args);
+    } else if (action == "configfile") {
+      handleConfigFile();
     } else if (action == "reboot") {
       handleReboot();
     } else if (action == "chat") {
@@ -181,11 +184,6 @@ void SerialConsole::showConfigHelp() {
 }
 
 void SerialConsole::handleConfig(const String& args) {
-  if (args.isEmpty()) {
-    showCurrentConfig();
-    return;
-  }
-  
   int spaceIndex = args.indexOf(' ');
 
   if (spaceIndex <= 0) {
@@ -239,11 +237,32 @@ void SerialConsole::handleConfig(const String& args) {
   }
 }
 
+void SerialConsole::handleConfigFile() {
+  const char* CONFIG_PATH = "/config/config.json";
+  
+  File file = LittleFS.open(CONFIG_PATH, "r");
+  if (!file) {
+    Serial.println("Config file not found: " + String(CONFIG_PATH));
+    return;
+  }
+  
+  Serial.println("Config File Content:");
+  Serial.println("====================");
+  Serial.println();
+  
+  while (file.available()) {
+    String line = file.readStringUntil('\n');
+    Serial.println(line);
+  }
+  
+  file.close();
+}
+
 void SerialConsole::handleHelp() {
   Serial.println("Available commands:");
   Serial.println("  /chat <message>    Send message to AI");
-  Serial.println("  /config             Show current configuration");
-  Serial.println("  /config <key> <value>  Set configuration");
+  Serial.println("  /config <key> <value>  Set configuration (use /config for list)");
+  Serial.println("  /configfile        Show config.json file content");
   Serial.println("  /status             Show system status");
   Serial.println("  /reboot            Reboot device");
   Serial.println("  /help              Show this help message");
