@@ -191,9 +191,12 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
       ::Serial.println("Content extracted: " + String(response.content.length()) + " bytes");
     }
 
+    ::Serial.println("Checking for tool_calls...");
     if (msg.containsKey("tool_calls")) {
+      ::Serial.println("Tool calls found");
       JsonArray toolCalls = msg["tool_calls"];
       response.toolCallCount = 0;
+      ::Serial.println("Tool calls count: " + String(toolCalls.size()));
       for (JsonVariant tcJson : toolCalls) {
         if (response.toolCallCount >= MAX_TOOL_CALLS) break;
 
@@ -222,10 +225,15 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
 
         response.toolCallCount++;
       }
+      ::Serial.println("Processed " + String(response.toolCallCount) + " tool calls");
+    } else {
+      ::Serial.println("No tool calls");
     }
   }
+  ::Serial.println("Checking for usage...");
 
   if (respDoc.containsKey("usage")) {
+    ::Serial.println("Usage found");
     JsonObject usage = respDoc["usage"];
     if (usage.containsKey("prompt_tokens")) {
       response.promptTokens = usage["prompt_tokens"].as<int>();
@@ -236,8 +244,12 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
     if (usage.containsKey("total_tokens")) {
       response.totalTokens = usage["total_tokens"].as<int>();
     }
+    ::Serial.println("Tokens - prompt:" + String(response.promptTokens) + " completion:" + String(response.completionTokens) + " total:" + String(response.totalTokens));
+  } else {
+    ::Serial.println("No usage");
   }
 
+  ::Serial.println("Returning response...");
   return response;
 }
 
