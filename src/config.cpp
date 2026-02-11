@@ -51,7 +51,7 @@ bool Config::load() {
     return false;
   }
 
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<512> doc;
   DeserializationError error = deserializeJson(doc, file);
   file.close();
 
