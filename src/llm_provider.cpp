@@ -44,10 +44,14 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   root["model"] = model;
   JsonArray msgs = root.createNestedArray("messages");
 
+  ::Serial.println("Building request for model: " + model);
+  ::Serial.println("Messages: " + String(messageCount));
+
   for (int i = 0; i < messageCount; i++) {
     JsonObject msgObj = msgs.createNestedObject();
     msgObj["role"] = messages[i].role;
     msgObj["content"] = messages[i].content;
+    ::Serial.println("  [" + messages[i].role + "] " + messages[i].content.substring(0, 30) + "...");
 
     int tcCount = 0;
     for (int j = 0; j < MAX_TOOL_CALLS; j++) {
@@ -75,12 +79,16 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
     }
   }
 
-  if (toolCount > 0) {
+  bool isZhipuAPI = apiBase_.indexOf("bigmodel.cn") > 0;
+
+  if (toolCount > 0 && !isZhipuAPI) {
     JsonArray toolsArr = root.createNestedArray("tools");
     for (int i = 0; i < toolCount; i++) {
       toolsArr.add(tools[i]);
     }
     root["tool_choice"] = "auto";
+  } else if (isZhipuAPI && toolCount > 0) {
+    ::Serial.println("Zhipu API detected, skipping tools (not supported)");
   }
 
   root["max_tokens"] = maxTokens;
