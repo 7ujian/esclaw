@@ -128,6 +128,8 @@ bool Config::save() {
   JsonObject json = doc.to<JsonObject>();
   saveToJson(json);
 
+  LittleFS.mkdir("/config");
+
   File file = LittleFS.open(CONFIG_PATH, "w");
   if (!file) {
     return false;

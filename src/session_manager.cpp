@@ -124,6 +124,8 @@ void SessionManager::saveSession(const String& sessionId) {
   }
 
   String path = getSessionPath(sessionId);
+  LittleFS.mkdir("/sessions");
+
   File file = LittleFS.open(path, "w");
   if (!file) {
     return;
@@ -182,6 +184,8 @@ bool SessionManager::loadSession(const String& sessionId) {
 }
 
 void SessionManager::loadAllSessions() {
+  LittleFS.mkdir("/sessions");
+
   File root = LittleFS.open("/sessions");
   if (!root || !root.isDirectory()) {
     root.close();
