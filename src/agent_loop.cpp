@@ -92,6 +92,11 @@ bool AgentLoop::processMessage(const InboundMessage& msg) {
       MessageBus::getInstance().publishOutbound(outMsg);
       ::Serial.println("Outbound message published");
       
+      ::Serial.println("Printing response to serial...");
+      ::Serial.println();
+      ::Serial.println(response.content);
+      ::Serial.println();
+      
       ::Serial.println("Saving session...");
       SessionManager::getInstance().saveSession(session->sessionId);
       ::Serial.println("Session saved");
