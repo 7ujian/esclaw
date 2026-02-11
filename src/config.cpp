@@ -42,25 +42,39 @@ void Config::setDefaults() {
 
 bool Config::load() {
   if (!LittleFS.exists(CONFIG_PATH)) {
+    ::Serial.println("Config file not found, creating default");
     setDefaults();
     return save();
   }
 
   File file = LittleFS.open(CONFIG_PATH, "r");
   if (!file) {
+    ::Serial.println("Failed to open config file");
     return false;
   }
 
-  StaticJsonDocument<512> doc;
+  size_t fileSize = file.size();
+  ::Serial.println("Config file size: " + String(fileSize) + " bytes");
+
+  if (fileSize > 512) {
+    ::Serial.println("Config file too large for buffer");
+    file.close();
+    return false;
+  }
+
+  StaticJsonDocument<1024> doc;
   DeserializationError error = deserializeJson(doc, file);
   file.close();
 
   if (error) {
+    ::Serial.println("JSON parse error: " + String(error.c_str()));
     return false;
   }
 
+  ::Serial.println("JSON parsed successfully");
   setDefaults();
   loadFromJson(doc.as<JsonObject>());
+  ::Serial.println("Config loaded. SSID: " + wifiConfig_.ssid);
   return true;
 }
 
