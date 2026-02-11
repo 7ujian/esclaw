@@ -34,15 +34,25 @@ void setup() {
 
   Config::getInstance().load();
 
+  Serial.println("WiFi SSID: " + Config::getInstance().getWiFiConfig().ssid);
+  if (Config::getInstance().getWiFiConfig().password.isEmpty()) {
+    Serial.println("WiFi Password: (empty)");
+  } else {
+    Serial.println("WiFi Password: ***");
+  }
+  Serial.println("WiFi Timeout: " + String(Config::getInstance().getWiFiConfig().timeout) + "s");
+
   WiFiManager::getInstance().configure(
     Config::getInstance().getWiFiConfig().ssid,
     Config::getInstance().getWiFiConfig().password
   );
 
+  Serial.println("Attempting WiFi connection...");
   if (WiFiManager::getInstance().connect()) {
     Serial.println("WiFi connected: " + WiFiManager::getInstance().getIP());
   } else {
-    Serial.println("WiFi not connected. Configure with /config");
+    Serial.println("WiFi connection failed. Status: " + String(WiFi.status()));
+    Serial.println("Configure with /config");
   }
 
   auto& cfg = Config::getInstance();
