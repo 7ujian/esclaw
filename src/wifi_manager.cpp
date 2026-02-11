@@ -80,7 +80,8 @@ bool WiFiManager::attemptConnection() {
   }
 
   if (WiFi.status() != WL_CONNECTED && !ssid_.isEmpty()) {
-    WiFi.reconnect();
+    WiFi.disconnect();
+    WiFi.begin(ssid_.c_str(), password_.c_str());
     lastConnectAttempt_ = now;
     delay(100);
   }
