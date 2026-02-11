@@ -146,14 +146,17 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   ::Serial.println("Response: " + String(responseBody.length()) + " bytes");
   http.stop();
 
+  ::Serial.println("Parsing JSON...");
   DynamicJsonDocument respDoc(4096);
   DeserializationError error = deserializeJson(respDoc, responseBody);
 
   if (error) {
     ::Serial.println("JSON parse error: " + String(error.c_str()));
+    ::Serial.println("Response body preview: " + responseBody.substring(0, 200));
     response.finishReason = "error: JSON parse failed";
     return response;
   }
+  ::Serial.println("JSON parsed successfully");
 
   if (!respDoc.containsKey("choices")) {
     response.finishReason = "error: no choices";
