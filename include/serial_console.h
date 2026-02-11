@@ -25,6 +25,7 @@ private:
 
    void processCommand(const String& command);
    void showConfigHelp();
+   void showCurrentConfig();
    void handleHelp();
    void handleStatus();
    void handleConfig(const String& args);

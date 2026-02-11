@@ -107,6 +107,58 @@ void SerialConsole::processCommand(const String& command) {
   Serial.println("🦞 ");
 }
 
+String maskApiKey(const String& key) {
+  if (key.length() <= 8) return "***";
+  return key.substring(0, 8) + "..." + key.substring(key.length() - 4);
+}
+
+void SerialConsole::showCurrentConfig() {
+  Config& config = Config::getInstance();
+  
+  Serial.println("Current Configuration:");
+  Serial.println("=====================");
+  Serial.println();
+  
+  Serial.println("[WiFi]");
+  Serial.println("  SSID: " + config.getWiFiConfig().ssid);
+  if (config.getWiFiConfig().password.isEmpty()) {
+    Serial.println("  Password: ");
+  } else {
+    Serial.println("  Password: ***");
+  }
+  Serial.println("  Timeout: " + String(config.getWiFiConfig().timeout) + "s");
+  Serial.println();
+  
+  Serial.println("[Agent]");
+  Serial.println("  Model: " + config.getAgentConfig().model);
+  Serial.println("  Max Tokens: " + String(config.getAgentConfig().maxTokens));
+  Serial.println("  Temperature: " + String(config.getAgentConfig().temperature));
+  Serial.println("  Max Tool Iterations: " + String(config.getAgentConfig().maxToolIterations));
+  Serial.println("  Max History Length: " + String(config.getAgentConfig().maxHistoryLength));
+  Serial.println();
+  
+  Serial.println("[Providers]");
+  Serial.println("  OpenAI API Key: " + maskApiKey(config.getProvidersConfig().openai.apiKey));
+  Serial.println("  OpenAI Base: " + config.getProvidersConfig().openai.apiBase);
+  Serial.println();
+  Serial.println("  Anthropic API Key: " + maskApiKey(config.getProvidersConfig().anthropic.apiKey));
+  Serial.println("  Anthropic Base: " + config.getProvidersConfig().anthropic.apiBase);
+  Serial.println();
+  Serial.println("  OpenRouter API Key: " + maskApiKey(config.getProvidersConfig().openrouter.apiKey));
+  Serial.println("  OpenRouter Base: " + config.getProvidersConfig().openrouter.apiBase);
+  Serial.println();
+  Serial.println("  Zhipu API Key: " + maskApiKey(config.getProvidersConfig().zhipu.apiKey));
+  Serial.println("  Zhipu Base: " + config.getProvidersConfig().zhipu.apiBase);
+  Serial.println();
+  Serial.println("  Groq API Key: " + maskApiKey(config.getProvidersConfig().groq.apiKey));
+  Serial.println("  Groq Base: " + config.getProvidersConfig().groq.apiBase);
+  Serial.println();
+  
+  Serial.println("[Web Server]");
+  Serial.println("  Enabled: " + String(config.getWebServerConfig().enabled ? "Yes" : "No"));
+  Serial.println("  Port: " + String(config.getWebServerConfig().port));
+}
+
 void SerialConsole::showConfigHelp() {
   Serial.println("Configuration Keys:");
   Serial.println("------------------");
@@ -129,6 +181,11 @@ void SerialConsole::showConfigHelp() {
 }
 
 void SerialConsole::handleConfig(const String& args) {
+  if (args.isEmpty()) {
+    showCurrentConfig();
+    return;
+  }
+  
   int spaceIndex = args.indexOf(' ');
 
   if (spaceIndex <= 0) {
@@ -185,7 +242,8 @@ void SerialConsole::handleConfig(const String& args) {
 void SerialConsole::handleHelp() {
   Serial.println("Available commands:");
   Serial.println("  /chat <message>    Send message to AI");
-  Serial.println("  /config <key> <value>  Set configuration (use /config for list)");
+  Serial.println("  /config             Show current configuration");
+  Serial.println("  /config <key> <value>  Set configuration");
   Serial.println("  /status             Show system status");
   Serial.println("  /reboot            Reboot device");
   Serial.println("  /help              Show this help message");
