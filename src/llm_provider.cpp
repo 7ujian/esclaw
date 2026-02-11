@@ -98,6 +98,9 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   serializeJson(doc, requestBody);
 
   ::Serial.println("Sending request...");
+  ::Serial.println("Request body:");
+  ::Serial.println(requestBody);
+  ::Serial.println();
   ::Serial.println("Request size: " + String(requestBody.length()) + " bytes");
 
   http.beginRequest();
