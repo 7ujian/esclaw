@@ -107,46 +107,32 @@ void SerialConsole::processCommand(const String& command) {
   Serial.println("🦞 ");
 }
 
-void SerialConsole::handleHelp() {
-  Serial.println("Available commands:");
-  Serial.println("  /chat <message>    Send message to AI");
-  Serial.println("  /config <key> <value>  Set configuration");
-  Serial.println("  /status             Show system status");
-  Serial.println("  /reboot            Reboot device");
-  Serial.println("  /help              Show this help");
-}
-
-void SerialConsole::handleStatus() {
-  Serial.println("System Status:");
-  Serial.println("----------------");
-  
-  WiFiManager& wifi = WiFiManager::getInstance();
-  Serial.print("WiFi: ");
-  if (wifi.isConnected()) {
-    Serial.print("Connected (");
-    Serial.print(wifi.getSSID());
-    Serial.print(", ");
-    Serial.print(wifi.getIP());
-    Serial.print(", RSSI: ");
-    Serial.print(wifi.getRSSI());
-    Serial.println(" dBm)");
-  } else {
-    Serial.println("Disconnected");
-  }
-
-  Serial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
-  Serial.println("Uptime: " + String(millis() / 1000) + " seconds");
-  
-  Config& config = Config::getInstance();
-  Serial.println("Model: " + config.getAgentConfig().model);
+void SerialConsole::showConfigHelp() {
+  Serial.println("Configuration Keys:");
+  Serial.println("------------------");
+  Serial.println("WiFi:");
+  Serial.println("  wifi.ssid <value>       Set WiFi SSID");
+  Serial.println("  wifi.password <value>    Set WiFi password");
+  Serial.println();
+  Serial.println("Agent:");
+  Serial.println("  agent.model <value>       Set AI model (e.g., gpt-3.5-turbo, glm-4)");
+  Serial.println();
+  Serial.println("LLM Providers:");
+  Serial.println("  providers.openai.apiKey <key>        Set OpenAI API key");
+  Serial.println("  providers.anthropic.apiKey <key>     Set Anthropic API key");
+  Serial.println("  providers.openrouter.apiKey <key>    Set OpenRouter API key");
+  Serial.println("  providers.zhipu.apiKey <key>       Set Zhipu AI API key");
+  Serial.println("  providers.groq.apiKey <key>        Set Groq API key");
+  Serial.println();
+  Serial.println("Usage: /config <key> <value>");
+  Serial.println("Example: /config providers.zhipu.apiKey sk-xxxxx");
 }
 
 void SerialConsole::handleConfig(const String& args) {
   int spaceIndex = args.indexOf(' ');
 
   if (spaceIndex <= 0) {
-    Serial.println("Usage: /config <key> <value>");
-    Serial.println("Available keys: wifi.ssid, wifi.password, agent.model");
+    showConfigHelp();
     return;
   }
 
@@ -194,6 +180,40 @@ void SerialConsole::handleConfig(const String& args) {
   } else {
     Serial.println("Failed to save configuration");
   }
+}
+
+void SerialConsole::handleHelp() {
+  Serial.println("Available commands:");
+  Serial.println("  /chat <message>    Send message to AI");
+  Serial.println("  /config <key> <value>  Set configuration (use /config for list)");
+  Serial.println("  /status             Show system status");
+  Serial.println("  /reboot            Reboot device");
+  Serial.println("  /help              Show this help message");
+}
+
+void SerialConsole::handleStatus() {
+  Serial.println("System Status:");
+  Serial.println("----------------");
+  
+  WiFiManager& wifi = WiFiManager::getInstance();
+  Serial.print("WiFi: ");
+  if (wifi.isConnected()) {
+    Serial.print("Connected (");
+    Serial.print(wifi.getSSID());
+    Serial.print(", ");
+    Serial.print(wifi.getIP());
+    Serial.print(", RSSI: ");
+    Serial.print(wifi.getRSSI());
+    Serial.println(" dBm)");
+  } else {
+    Serial.println("Disconnected");
+  }
+
+  Serial.println("Free Heap: " + String(ESP.getFreeHeap()) + " bytes");
+  Serial.println("Uptime: " + String(millis() / 1000) + " seconds");
+  
+  Config& config = Config::getInstance();
+  Serial.println("Model: " + config.getAgentConfig().model);
 }
 
 void SerialConsole::handleReboot() {

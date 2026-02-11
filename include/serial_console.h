@@ -23,11 +23,12 @@ private:
   String inputBuffer_;
   bool inputReady_;
 
-  void processCommand(const String& command);
-  void handleHelp();
-  void handleStatus();
-  void handleConfig(const String& args);
-  void handleReboot();
-};
+   void processCommand(const String& command);
+   void showConfigHelp();
+   void handleHelp();
+   void handleStatus();
+   void handleConfig(const String& args);
+   void handleReboot();
+ };
 
 #endif
