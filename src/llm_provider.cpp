@@ -38,6 +38,8 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
 
   HttpClient http(client, host, 443);
 
+  bool isZhipuAPI = apiBase_.indexOf("bigmodel.cn") > 0;
+
   DynamicJsonDocument doc(2048);
   JsonObject root = doc.to<JsonObject>();
 
@@ -45,9 +47,14 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   JsonArray msgs = root.createNestedArray("messages");
 
   ::Serial.println("Building request for model: " + model);
-  ::Serial.println("Messages: " + String(messageCount));
+  ::Serial.println("Is Zhipu API: " + String(isZhipuAPI ? "yes" : "no"));
 
   for (int i = 0; i < messageCount; i++) {
+    if (isZhipuAPI && messages[i].role == "system") {
+      ::Serial.println("  Skipping system message for Zhipu API");
+      continue;
+    }
+
     JsonObject msgObj = msgs.createNestedObject();
     msgObj["role"] = messages[i].role;
     msgObj["content"] = messages[i].content;
@@ -78,8 +85,6 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
       msgObj["tool_call_id"] = messages[i].toolCallId;
     }
   }
-
-  bool isZhipuAPI = apiBase_.indexOf("bigmodel.cn") > 0;
 
   if (toolCount > 0 && !isZhipuAPI) {
     JsonArray toolsArr = root.createNestedArray("tools");
