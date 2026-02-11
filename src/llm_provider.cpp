@@ -1,0 +1,249 @@
+#include "llm_provider.h"
+#include <ArduinoHttpClient.h>
+#include <WiFiClientSecure.h>
+
+HTTPProvider::HTTPProvider(const String& apiKey, const String& apiBase)
+    : apiKey_(apiKey), apiBase_(apiBase) {
+}
+
+LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
+                               JsonVariantConst* tools, int toolCount,
+                               String model,
+                               int maxTokens,
+                               float temperature) {
+  LLMResponse response;
+  response.content = "";
+  response.toolCallCount = 0;
+  response.finishReason = "unknown";
+  response.promptTokens = 0;
+  response.completionTokens = 0;
+  response.totalTokens = 0;
+
+  if (apiBase_.isEmpty()) {
+    response.finishReason = "error: no API base configured";
+    return response;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+
+  String host = apiBase_.substring(8);
+  int slashIndex = host.indexOf('/');
+  if (slashIndex > 0) {
+    host = host.substring(0, slashIndex);
+  }
+
+  String path = apiBase_.substring(apiBase_.indexOf('/', 8));
+  path += "/chat/completions";
+
+  HttpClient http(client, host, 443);
+
+  StaticJsonDocument<4096> doc;
+  JsonObject root = doc.to<JsonObject>();
+
+  root["model"] = model;
+  JsonArray msgs = root.createNestedArray("messages");
+
+  for (int i = 0; i < messageCount; i++) {
+    JsonObject msgObj = msgs.createNestedObject();
+    msgObj["role"] = messages[i].role;
+    msgObj["content"] = messages[i].content;
+
+    int tcCount = 0;
+    for (int j = 0; j < MAX_TOOL_CALLS; j++) {
+      if (messages[i].toolCalls[j].name.length() > 0) {
+        tcCount++;
+      } else {
+        break;
+      }
+    }
+
+    if (tcCount > 0) {
+      JsonArray toolCalls = msgObj.createNestedArray("tool_calls");
+      for (int j = 0; j < tcCount; j++) {
+        const ToolCall& tc = messages[i].toolCalls[j];
+        JsonObject tcObj = toolCalls.createNestedObject();
+        tcObj["id"] = tc.id;
+        tcObj["type"] = tc.type;
+
+        JsonObject function = tcObj.createNestedObject("function");
+        function["name"] = tc.name;
+        function["arguments"] = tc.arguments;
+      }
+    } else if (messages[i].toolCallId.length() > 0) {
+      msgObj["tool_call_id"] = messages[i].toolCallId;
+    }
+  }
+
+  if (toolCount > 0) {
+    JsonArray toolsArr = root.createNestedArray("tools");
+    for (int i = 0; i < toolCount; i++) {
+      toolsArr.add(tools[i]);
+    }
+    root["tool_choice"] = "auto";
+  }
+
+  root["max_tokens"] = maxTokens;
+  root["temperature"] = temperature;
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  ::Serial.println("Sending request...");
+
+  http.beginRequest();
+  http.post(path);
+  http.sendHeader("Content-Type", "application/json");
+  if (apiKey_.length() > 0) {
+    http.sendHeader("Authorization", "Bearer " + apiKey_);
+  }
+  http.sendHeader("Content-Length", String(requestBody.length()));
+  http.beginBody();
+  http.print(requestBody);
+  http.endRequest();
+
+  int statusCode = http.responseStatusCode();
+  ::Serial.println("Status: " + String(statusCode));
+
+  if (statusCode != 200) {
+    String errorBody = http.responseBody();
+    ::Serial.println("Error: " + errorBody);
+    response.finishReason = "error: HTTP " + String(statusCode);
+    http.stop();
+    return response;
+  }
+
+  String responseBody = http.responseBody();
+  ::Serial.println("Response: " + String(responseBody.length()) + " bytes");
+  http.stop();
+
+  StaticJsonDocument<4096> respDoc;
+  DeserializationError error = deserializeJson(respDoc, responseBody);
+
+  if (error) {
+    ::Serial.println("JSON parse error");
+    response.finishReason = "error: JSON parse failed";
+    return response;
+  }
+
+  if (!respDoc.containsKey("choices")) {
+    response.finishReason = "error: no choices";
+    return response;
+  }
+
+  JsonArray choices = respDoc["choices"];
+  if (choices.size() == 0) {
+    response.finishReason = "error: empty choices";
+    return response;
+  }
+
+  JsonObject choice = choices[0];
+  if (choice.containsKey("finish_reason")) {
+    response.finishReason = choice["finish_reason"].as<String>();
+  }
+
+  if (choice.containsKey("message")) {
+    JsonObject msg = choice["message"];
+    if (msg.containsKey("content")) {
+      response.content = msg["content"].as<String>();
+    }
+
+    if (msg.containsKey("tool_calls")) {
+      JsonArray toolCalls = msg["tool_calls"];
+      response.toolCallCount = 0;
+      for (JsonVariant tcJson : toolCalls) {
+        if (response.toolCallCount >= MAX_TOOL_CALLS) break;
+
+        JsonObject tcObj = tcJson.as<JsonObject>();
+        ToolCall& tc = response.toolCalls[response.toolCallCount];
+
+        if (tcObj.containsKey("id")) {
+          tc.id = tcObj["id"].as<String>();
+        }
+
+        if (tcObj.containsKey("type")) {
+          tc.type = tcObj["type"].as<String>();
+        } else {
+          tc.type = "function";
+        }
+
+        if (tcObj.containsKey("function")) {
+          JsonObject func = tcObj["function"];
+          if (func.containsKey("name")) {
+            tc.name = func["name"].as<String>();
+          }
+          if (func.containsKey("arguments")) {
+            tc.arguments = func["arguments"].as<String>();
+          }
+        }
+
+        response.toolCallCount++;
+      }
+    }
+  }
+
+  if (respDoc.containsKey("usage")) {
+    JsonObject usage = respDoc["usage"];
+    if (usage.containsKey("prompt_tokens")) {
+      response.promptTokens = usage["prompt_tokens"].as<int>();
+    }
+    if (usage.containsKey("completion_tokens")) {
+      response.completionTokens = usage["completion_tokens"].as<int>();
+    }
+    if (usage.containsKey("total_tokens")) {
+      response.totalTokens = usage["total_tokens"].as<int>();
+    }
+  }
+
+  return response;
+}
+
+String HTTPProvider::getDefaultModel() const {
+  return "gpt-3.5-turbo";
+}
+
+LLMProvider* createProvider(String model, String openaiKey, String openaiBase,
+                           String anthropicKey, String anthropicBase,
+                           String openrouterKey, String openrouterBase,
+                           String zhipuKey, String zhipuBase,
+                           String groqKey, String groqBase) {
+  String modelLower = model;
+  modelLower.toLowerCase();
+
+  String apiKey;
+  String apiBase;
+
+  if (modelLower.startsWith("openrouter/") || modelLower.startsWith("anthropic/") ||
+      modelLower.startsWith("openai/") || modelLower.startsWith("meta-llama/") ||
+      modelLower.startsWith("deepseek/") || modelLower.startsWith("google/")) {
+    apiKey = openrouterKey;
+    apiBase = (openrouterBase.length() > 0) ? openrouterBase : "https://openrouter.ai/api/v1";
+  }
+  else if (modelLower.indexOf("claude") >= 0 || modelLower.startsWith("anthropic/")) {
+    apiKey = anthropicKey;
+    apiBase = (anthropicBase.length() > 0) ? anthropicBase : "https://api.anthropic.com/v1";
+  }
+  else if (modelLower.indexOf("gpt") >= 0 || modelLower.startsWith("openai/")) {
+    apiKey = openaiKey;
+    apiBase = (openaiBase.length() > 0) ? openaiBase : "https://api.openai.com/v1";
+  }
+  else if (modelLower.indexOf("glm") >= 0 || modelLower.indexOf("zhipu") >= 0 ||
+           modelLower.indexOf("zai") >= 0) {
+    apiKey = zhipuKey;
+    apiBase = (zhipuBase.length() > 0) ? zhipuBase : "https://open.bigmodel.cn/api/paas/v4";
+  }
+  else if (modelLower.indexOf("groq") >= 0 || modelLower.startsWith("groq/")) {
+    apiKey = groqKey;
+    apiBase = (groqBase.length() > 0) ? groqBase : "https://api.groq.com/openai/v1";
+  }
+  else {
+    apiKey = openrouterKey;
+    apiBase = (openrouterBase.length() > 0) ? openrouterBase : "https://openrouter.ai/api/v1";
+  }
+
+  if (apiKey.length() == 0) {
+    return nullptr;
+  }
+
+  return new HTTPProvider(apiKey, apiBase);
+}
