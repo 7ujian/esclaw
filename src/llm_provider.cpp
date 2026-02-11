@@ -102,6 +102,11 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   String requestBody;
   serializeJson(doc, requestBody);
 
+  ::Serial.println("API Base: " + apiBase_);
+  ::Serial.println("Host: " + host);
+  ::Serial.println("Path: " + path);
+  ::Serial.println("API Key: " + (apiKey_.isEmpty() ? "(empty)" : (apiKey_.substring(0, 8) + "..." + apiKey_.substring(apiKey_.length() - 4))));
+  ::Serial.println();
   ::Serial.println("Sending request...");
   ::Serial.println("Request body:");
   ::Serial.println(requestBody);
