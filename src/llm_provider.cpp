@@ -38,7 +38,7 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
 
   HttpClient http(client, host, 443);
 
-  StaticJsonDocument<4096> doc;
+  DynamicJsonDocument doc(2048);
   JsonObject root = doc.to<JsonObject>();
 
   root["model"] = model;
@@ -90,6 +90,7 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   serializeJson(doc, requestBody);
 
   ::Serial.println("Sending request...");
+  ::Serial.println("Request size: " + String(requestBody.length()) + " bytes");
 
   http.beginRequest();
   http.post(path);
@@ -117,11 +118,11 @@ LLMResponse HTTPProvider::chat(Message* messages, int messageCount,
   ::Serial.println("Response: " + String(responseBody.length()) + " bytes");
   http.stop();
 
-  StaticJsonDocument<4096> respDoc;
+  DynamicJsonDocument respDoc(4096);
   DeserializationError error = deserializeJson(respDoc, responseBody);
 
   if (error) {
-    ::Serial.println("JSON parse error");
+    ::Serial.println("JSON parse error: " + String(error.c_str()));
     response.finishReason = "error: JSON parse failed";
     return response;
   }
