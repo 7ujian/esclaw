@@ -18,11 +18,11 @@ void ContextBuilder::setMaxHistory(int maxHistory) {
 
 String ContextBuilder::buildSystemPrompt() {
   String prompt = "";
-  
+
   const char* ptr = AGENTS_MD;
   int len = strlen_P(AGENTS_MD);
   for (int i = 0; i < len && prompt.length() < 1000; i++) {
-    prompt += pgm_read_byte_near(ptr + i);
+    prompt += (char)pgm_read_byte_near(ptr + i);
   }
 
   return prompt;
