@@ -1,7 +1,6 @@
 #include "agent_loop.h"
 #include "tools.h"
 #include "message_bus.h"
-#include "logger.h"
 
 AgentLoop::AgentLoop()
   : llmProvider_(nullptr) {
@@ -47,8 +46,6 @@ bool AgentLoop::processMessage(const InboundMessage& msg) {
   llmMessages[1].content = msg.content;
 
   for (int iteration = 0; iteration < maxIterations; iteration++) {
-    LOG_VERBOSE("=== Starting LLM call (iteration " + String(iteration) + ") ===");
-    
     LLMResponse response = llmProvider_->chat(
       llmMessages, 2,
       nullptr, 0,
@@ -56,9 +53,6 @@ bool AgentLoop::processMessage(const InboundMessage& msg) {
       cfg.getAgentConfig().maxTokens,
       cfg.getAgentConfig().temperature
     );
-
-    LOG_VERBOSE("=== LLM call returned ===");
-    LOG_VERBOSE("Finish reason: " + response.finishReason);
 
     if (response.finishReason.startsWith("error")) {
       OutboundMessage outMsg;
@@ -70,8 +64,6 @@ bool AgentLoop::processMessage(const InboundMessage& msg) {
     }
 
     if (response.toolCallCount == 0) {
-      LOG_VERBOSE("No tool calls, saving response...");
-      
       SessionManager::getInstance().addMessage(session->sessionId, "user", msg.content);
       SessionManager::getInstance().addMessage(session->sessionId, "assistant", response.content);
       
@@ -84,6 +76,7 @@ bool AgentLoop::processMessage(const InboundMessage& msg) {
       Serial.println();
       Serial.println(response.content);
       Serial.println();
+      Serial.println("🦞 ");
       
       SessionManager::getInstance().saveSession(session->sessionId);
       
